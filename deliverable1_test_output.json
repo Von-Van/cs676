@@ -1,0 +1,20 @@
+[
+  {
+    "url": "https://pubmed.ncbi.nlm.nih.gov/123456/",
+    "use_text": false,
+    "page_text_preview": null,
+    "result": {
+      "score": 84.0,
+      "explanation": "Uses HTTPS (+5). Recognized reputable domain 'nih.gov' (+19.0). High-trust TLD (.gov) (+10). NLP layer present but disabled (set use_text=True to enable)."
+    }
+  },
+  {
+    "url": "https://example.com/research/article",
+    "use_text": true,
+    "page_text_preview": "Some say this could be a miracle cure!!! DOI: 10.1016/j.cell.2024.01.001",
+    "result": {
+      "score": 56.0,
+      "explanation": "Uses HTTPS (+5). Research-oriented path hint (+5). sensational terms (2) (-4.0). weasel terms (2) (-2.0). doi pattern (hits=1>=thr=1) (+2.0)."
+    }
+  }
+]
