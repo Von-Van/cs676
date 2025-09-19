@@ -1,0 +1,3 @@
+#deliverable 3 requirements.txt
+fastapi
+uvicorn[standard]

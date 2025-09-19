@@ -1,5 +1,5 @@
 # integrated_scoring.py
-
+  #for deliverable 3
 #End-to-end scoring helper that:
 #1) Fetches & extracts page text automatically.
 #2) Applies a tiny ML signal (transformers sentiment if available; VADER fallback).
