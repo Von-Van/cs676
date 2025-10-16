@@ -29,16 +29,21 @@ def fetch_page_text(url: str, timeout: float = 4.0, max_chars: int = 20000) -> T
         html = resp.text
         steps.append("Fetched HTML via requests.")
 
-        # Try trafilatura first (best for messy sites)
-        try:
-            import trafilatura
-            extracted = trafilatura.extract(html, include_comments=False, include_tables=False)
-            if extracted and extracted.strip():
-                text = extracted.strip()
-                steps.append("Extracted text with trafilatura.")
-                return text[:max_chars], "; ".join(steps)
-        except Exception:
-            steps.append("trafilatura not available or failed.")
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+
+# ---- 2) Skip non-HTML and very large bodies ----
+        ct = resp.headers.get("Content-Type", "").lower()
+        if "text/html" not in ct:
+            steps.append(f"Skipped non-HTML content-type: {ct}")
+            return None, "; ".join(steps)
+
+        if len(resp.content) > 5_000_000:  # ~5MB
+            steps.append("Body too large; skipping (>5MB).")
+            return None, "; ".join(steps)
+
+        html = resp.text
+        steps.append("Fetched HTML via requests.")
 
         # Try readability-lxml
         try:
@@ -71,45 +76,41 @@ def fetch_page_text(url: str, timeout: float = 4.0, max_chars: int = 20000) -> T
 
 # ---- 3) ML signal (transformers sentiment ▷ VADER ▷ no-op) ----
 def ml_text_signal(text: Optional[str]) -> Tuple[float, str]:
-    
-    #Returns (delta, note). Small, conservative contribution:
-     # - strong negative sentiment → small negative delta
-     # - strong positive sentiment → even smaller positive delta
-    
     if not text or not text.strip():
         return 0.0, "ML: no text provided."
 
-    # Try transformers pipeline
+    # Try a tiny, pre-finetuned model (fast + already cached in HF infra)
     try:
-        from transformers import pipeline  # pip install transformers
-        nlp = pipeline("sentiment-analysis")  # uses a small default model
-        # Use first ~2000 chars for speed
-        snippet = text[:2000]
-        out = nlp(snippet[:512])[0]  # run once on a short snippet
-        label = out["label"].upper()
+        from transformers import pipeline
+        nlp = pipeline(
+            "sentiment-analysis",
+            model="distilbert-base-uncased-finetuned-sst-2-english",  # small & common
+            truncation=True
+        )
+        snippet = text[:1500]
+        out = nlp(snippet[:512])[0]
+        label = str(out["label"]).upper()
         score = float(out["score"])
-        # Map sentiment to a tiny credibility delta
-        if label == "NEGATIVE":
-            delta = round(-3.0 * score, 2)  # up to ~-3
-        elif label == "POSITIVE":
-            delta = round( 2.0 * score, 2)  # up to ~+2
-        else:
-            delta = 0.0
+        delta = -3.0 * score if label == "NEGATIVE" else (2.0 * score if label == "POSITIVE" else 0.0)
+        delta = round(delta, 2)
         return delta, f"ML(transformers): {label} ({score:.2f}) → {delta:+.2f}"
     except Exception:
         pass
 
-    # Fallback: VADER (if available)
+    # Fallback: VADER (download lexicon if missing)
     try:
-        from nltk.sentiment import SentimentIntensityAnalyzer  # pip install nltk
+        import nltk
+        try:
+            from nltk.sentiment import SentimentIntensityAnalyzer
+        except LookupError:
+            nltk.download("vader_lexicon")
+            from nltk.sentiment import SentimentIntensityAnalyzer
         sia = SentimentIntensityAnalyzer()
         s = sia.polarity_scores(text[:4000])
         comp = s["compound"]
-        delta = round(5.0*comp if comp > 0 else 7.0*comp, 2)  # ~[-7,+5], can be tuned
-        # Clamp to smaller impact to keep rules dominant
-        if delta > 2.0: delta = 2.0
-        if delta < -3.0: delta = -3.0
-        return float(delta), f"ML(VADER): compound={comp:+.3f} → {delta:+.2f}"
+        delta = 5.0*comp if comp > 0 else 7.0*comp
+        delta = float(max(-3.0, min(2.0, round(delta, 2))))  # clamp
+        return delta, f"ML(VADER): compound={comp:+.3f} → {delta:+.2f}"
     except Exception:
         pass
 
