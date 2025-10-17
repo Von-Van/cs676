@@ -169,3 +169,19 @@ In the browser interface:
 - [x] `evaluate.py` generates `runs\main_report.md`  
 - [x] `export_conversation_history.py` creates `conversation_history.md`  
 - [x] Optional: Streamlit app launches successfully on http://localhost:8501  
+
+## 💻 System Requirements
+| Component | Recommended |
+|:--|:--|
+| OS | Windows 10/11 (64-bit) or macOS 13+ |
+| Python | 3.10 or later |
+| Memory | 8 GB RAM minimum |
+| Internet | Stable connection to OpenAI API |
+
+### ⚙️ Performance Notes
+Each simulation call uses a GPT-4o-mini model request per persona turn.  
+Approximate run time = 5–10 s × (number of turns × personas).  
+For best performance:  
+- Keep `max_tokens ≤ 1024` in `config.ini`  
+- Disable parallel modes on Windows (`parallel_agent_actions=False`)  
+- Use smaller `--turns` for quick tests  
