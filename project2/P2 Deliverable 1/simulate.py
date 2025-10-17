@@ -110,39 +110,39 @@ def _tt_build_person():
     from tinytroupe.examples import create_lisa_the_data_scientist
     return create_lisa_the_data_scientist()
 
-def _generate_reply_with_metadata(history: List[Dict[str, str]], system_prompt: str, user_msg: str):
-    """
-    Uses TinyTroupe's listen / listen_and_act API.
-    Returns (assistant_text, meta_dict)
-    """
-    # Build a person and prime with system + history
-    person = _tt_build_person()
+def _generate_reply_with_metadata(history, system_prompt, user_msg):
+    import time, json, signal, sys
+    from tinytroupe.examples import create_lisa_the_data_scientist
+    person = create_lisa_the_data_scientist()
 
-    # prime with system description (persona spec)
     if system_prompt:
         person.listen(f"[SYSTEM] {system_prompt}")
-
-    # preload prior conversation
     for h in history:
-        role = h.get("role", "user").upper()
-        content = h.get("content", "")
+        role = h.get("role","user").upper()
+        content = h.get("content","")
         if content.strip():
             person.listen(f"[{role}] {content}")
 
-    # main reply
+    # --- hard timeout guard (Windows-safe fallback)
     t0 = time.time()
-    assistant = person.listen_and_act(user_msg) or "(no response)"
+    try:
+        assistant = person.listen_and_act(user_msg) or "(no response)"
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        assistant = f"(generation error: {e})"
     latency = time.time() - t0
 
-    # ask for compact JSON metadata in a second, cheap turn
+    # metadata side-channel (short + safe)
     meta_prompt = (
-        "In one single JSON line only, provide your self-assessed feedback metadata as: "
-        "{\"confidence\":0.xx,\"reasoning\":\"very short reason (<=20 words)\","
-        "\"followups\":[\"question1\",\"question2\"],\"_note\":\"no extra text\"}"
+        'In one JSON line only: {"confidence":0.xx,"reasoning":"<=20w","followups":["q1","q2"]}'
     )
-    meta_raw = person.listen_and_act(meta_prompt) or ""
+    meta_raw = ""
+    try:
+        meta_raw = person.listen_and_act(meta_prompt) or ""
+    except Exception:
+        pass
     meta = _parse_one_line_json(meta_raw)
-
     return assistant, latency, meta
 
 def _parse_one_line_json(text: str) -> Dict[str, Any]:

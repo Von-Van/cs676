@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-export_conversation_history.py
-Create an annotated Markdown transcript from simulate.py JSONL output.
+export_conversation_history.py — produce a readable, annotated Markdown transcript.
+
+- Groups by persona
+- Shows the FEATURE at the top
+- Displays assistant metadata (reasoning, confidence, followups) inline
 
 Usage:
-  python export_conversation_history.py --in runs/test_run.jsonl --out conversation_history.md --personas personas.json
+  python export_conversation_history.py --in runs\\test_run.jsonl --out conversation_history.md --personas personas.json
 """
 
 import argparse, json, datetime
@@ -15,8 +18,7 @@ def read_jsonl(path: str) -> List[dict]:
     rows = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            line = line.strip()
-            if line:
+            if line.strip():
                 rows.append(json.loads(line))
     return rows
 
@@ -26,13 +28,6 @@ def load_personas(path: Optional[str]) -> Dict[str, dict]:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return {p["id"]: p for p in data}
-
-def format_turn(role: str, content: str) -> str:
-    tag = "**User**" if role == "user" else "**Assistant**"
-    # indent block for readability
-    lines = content.strip().splitlines()
-    indented = "\n".join("> " + ln for ln in lines if ln.strip() != "")
-    return f"{tag}\n{indented}\n"
 
 def persona_header(meta: dict, pid: str) -> str:
     name = meta.get("name", pid)
@@ -45,66 +40,77 @@ def persona_header(meta: dict, pid: str) -> str:
         f"**Demographics:** {demo}\n\n"
         f"**Traits:** {traits}\n\n"
         f"**Goals:** {goals}\n\n"
-        f"**Style notes:** {style}\n\n"
+        f"**Style notes:** {style}\n"
     )
 
-def auto_annotation(example_user_msgs: List[str], example_assistant_msgs: List[str]) -> str:
-    # lightweight hints to seed your comments
-    u0 = (example_user_msgs[0][:160] + "…") if example_user_msgs else "—"
-    a0 = (example_assistant_msgs[0][:160] + "…") if example_assistant_msgs else "—"
-    return (
-        "### Annotations (draft)\n"
-        "- **Context of first exchange:** " + u0 + "\n"
-        "- **Assistant opening tone:** " + a0 + "\n"
-        "- **Consistency check:** Does tone/voice stay aligned with persona across turns?\n"
-        "- **Depth check:** Are answers specific, avoiding generic filler?\n"
-        "- **Edge cases:** Any hallucinations, repetition, or policy issues?\n\n"
-    )
+def format_turn(t: dict) -> str:
+    role = t.get("role", "").capitalize()
+    content = (t.get("content") or "").strip()
+    lines = [f"**{role}**"]
+    # blockquote content
+    for ln in content.splitlines():
+        if ln.strip():
+            lines.append("> " + ln)
+    # assistant metadata
+    if role == "Assistant":
+        rs = t.get("reasoning_summary")
+        conf = t.get("confidence")
+        fus = t.get("followups") or []
+        meta_bits = []
+        if rs:   meta_bits.append(f"Reasoning: {rs}")
+        if conf is not None: meta_bits.append(f"Confidence: {conf:.2f}")
+        if fus:  meta_bits.append("Follow-ups: " + "; ".join(str(x) for x in fus))
+        if meta_bits:
+            lines.append(f"> _Meta_: " + " | ".join(meta_bits))
+    return "\n".join(lines) + "\n"
 
 def export_markdown(records: List[dict], personas_by_id: Dict[str, dict]) -> str:
-    # group records by persona, then order by turn_index
     by_pid: Dict[str, List[dict]] = defaultdict(list)
+    features: Dict[str, str] = {}
+
     for r in records:
-        by_pid[r.get("persona_id", "unknown")].append(r)
+        pid = r.get("persona_id", "unknown")
+        by_pid[pid].append(r)
+        # remember feature (same for all turns in run/persona)
+        ftxt = r.get("feature_text")
+        if ftxt and pid not in features:
+            features[pid] = ftxt
+
     for pid in by_pid:
         by_pid[pid].sort(key=lambda x: x.get("turn_index", 0))
 
     date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    md = [
+    out = [
         f"# Conversation History",
         f"_Generated: {date}_",
         "",
-        "This file organizes conversation logs **by persona** and includes space for annotations explaining key exchanges.",
+        "Organized by persona; includes assistant metadata (reasoning, confidence, followups).",
         ""
     ]
 
     for pid, turns in by_pid.items():
         meta = personas_by_id.get(pid, {"name": pid})
-        md.append(persona_header(meta, pid))
-
-        # brief auto-annotations
-        user_msgs = [t["content"] for t in turns if t.get("role") == "user"]
-        asst_msgs = [t["content"] for t in turns if t.get("role") == "assistant"]
-        md.append(auto_annotation(user_msgs, asst_msgs))
-
-        md.append("### Transcript\n")
+        out.append(persona_header(meta, pid))
+        feat = features.get(pid, "").strip()
+        if feat:
+            out.append(f"**Feature under review:** {feat}\n")
+        out.append("### Transcript\n")
         for t in turns:
-            md.append(format_turn(t.get("role", ""), t.get("content", "")))
-        md.append("\n---\n")
+            out.append(format_turn(t))
+        out.append("\n---\n")
 
-    return "\n".join(md)
+    return "\n".join(out)
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in", dest="inp", required=True, help="Input JSONL from simulate.py")
-    ap.add_argument("--out", required=True, help="Output Markdown path")
-    ap.add_argument("--personas", default=None, help="Optional personas.json for headers")
+    ap.add_argument("--in", dest="inp", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--personas", default=None)
     args = ap.parse_args()
 
     records = read_jsonl(args.inp)
     personas_by_id = load_personas(args.personas)
     md = export_markdown(records, personas_by_id)
-
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(md)
     print(f"Wrote conversation history to: {args.out}")
