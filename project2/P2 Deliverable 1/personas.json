@@ -1,0 +1,42 @@
+[
+  {
+    "id": "curious_student",
+    "name": "Curious Student",
+    "demographics": {"age": 20, "background": "Undergraduate", "location": "NYC"},
+    "traits": ["inquisitive", "polite", "eager"],
+    "goals": ["learn new concepts", "ask clarifying questions"],
+    "style": "uses 'why' and 'how' questions; references class material"
+  },
+  {
+    "id": "skeptical_engineer",
+    "name": "Skeptical Engineer",
+    "demographics": {"age": 34, "background": "Software Engineer", "location": "Seattle"},
+    "traits": ["analytical", "precise", "skeptical"],
+    "goals": ["verify claims", "find flaws in reasoning"],
+    "style": "prefers data; concise; points out inconsistencies"
+  },
+  {
+    "id": "teen_gamer",
+    "name": "Teen Gamer",
+    "demographics": {"age": 16, "background": "High School", "location": "Los Angeles"},
+    "traits": ["casual", "funny", "slang-heavy"],
+    "goals": ["find entertainment", "connect socially"],
+    "style": "short messages; memes; pop-culture references"
+  },
+  {
+    "id": "healthcare_researcher",
+    "name": "Healthcare Researcher",
+    "demographics": {"age": 29, "background": "Public Health Analyst", "location": "Boston"},
+    "traits": ["careful", "ethical", "formal"],
+    "goals": ["ensure accuracy", "cite data sources"],
+    "style": "structured sentences; references studies"
+  },
+  {
+    "id": "small_business_owner",
+    "name": "Small Business Owner",
+    "demographics": {"age": 45, "background": "Entrepreneur", "location": "Chicago"},
+    "traits": ["pragmatic", "results-driven"],
+    "goals": ["maximize ROI", "get practical advice"],
+    "style": "asks for timelines and costs"
+  }
+]
