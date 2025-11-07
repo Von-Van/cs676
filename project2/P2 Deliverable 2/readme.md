@@ -81,9 +81,24 @@ python scripts/run_experiment.py --runs 3 --variants baseline improved
 
 Analyze results:
 
-```bash
+> Tip: `analyze_conversations.py` now defaults to the most-recent conversation log in `outputs/` when no input file is supplied.
+
+Analyze a specific file:
+
+```cmd
 python scripts/analyze_conversations.py --experiment outputs/experiments/results.jsonl
 ```
+
+Analyze the most recent conversation log (no arguments):
+
+```cmd
+python scripts/analyze_conversations.py
+```
+
+Options:
+
+- `--output-dir <path>` — write visualizations and report into a specific directory (defaults to the input file's parent).
+- `--skip-readme` — skip updating the project `README.md` with a short summary of the analysis.
 
 ## Analysis Features
 
