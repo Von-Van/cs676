@@ -44,8 +44,7 @@
 
 ## Manual Launch (If scripts don't work):
 ```cmd
-cd "C:\Users\jakem\Documents\GitHub\cs676\project2\P2 Deliverable 2"
-.venv\Scripts\activate
+cd ""
 streamlit run app.py
 ```
 
