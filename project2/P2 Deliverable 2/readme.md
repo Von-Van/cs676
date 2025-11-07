@@ -1,6 +1,104 @@
 # AI Agent Conversation Simulator
 
-Simulated conversations between AI personas discussing product features and technical decisions. Built with TinyTroupe for persona-based feedback simulation.
+An advanced persona-based feedback simulation system that leverages AI agents to generate realistic conversations about product features, technical decisions, and strategic initiatives. Built with TinyTroupe for sophisticated multi-agent simulations that provide early-stage validation and diverse perspective synthesis.
+
+## Simulation Algorithm Design
+
+### Core Architecture
+
+The simulation system employs a sophisticated multi-agent architecture built on TinyTroupe, designed to model realistic human perspectives and decision-making processes in product development contexts.
+
+#### 1. Persona Modeling Framework
+
+**Cognitive Architecture**: Each AI persona is modeled as a `TinyPerson` with layered psychological and professional attributes:
+
+- **Identity Layer**: Core biographical data (name, role, background) establishing professional context
+- **Personality Layer**: Behavioral traits, decision-making patterns, and communication styles
+- **Goal Layer**: Professional objectives, priorities, and success metrics that drive responses
+- **Contextual Layer**: Domain expertise, experience level, and perspective framing
+
+**Persona Specification Schema**:
+```json
+{
+  "personality": {
+    "traits": ["methodical", "forward-thinking", "detail-oriented"],
+    "goals": ["Ensure system scalability", "Design elegant solutions"],
+    "style": "Analytical and thorough",
+    "communication": "structured",
+    "decisions": "data-driven",
+    "approach": "systematic"
+  }
+}
+```
+
+**Psychological Consistency**: The system maintains persona consistency through:
+- **Memory Architecture**: Each agent maintains episodic and semantic memory of the conversation
+- **Belief Systems**: Core professional values that influence all responses
+- **Cognitive Biases**: Realistic decision-making patterns based on role and experience
+- **Emotional State**: Contextual emotional responses that affect communication style
+
+#### 2. Feature Description Processing
+
+**Multi-Modal Input Processing**: The system accepts various feature description formats:
+
+- **Natural Language Prompts**: Conversational feature descriptions for ideation phases
+- **Technical Specifications**: Detailed requirements for engineering evaluation
+- **User Stories**: Product requirements for user-centered analysis
+- **Business Cases**: Strategic initiatives for market validation
+
+**Semantic Analysis Pipeline**:
+1. **Context Extraction**: Identifies key product domains, technical requirements, and business objectives
+2. **Stakeholder Mapping**: Determines which personas are most relevant for the discussion
+3. **Complexity Assessment**: Evaluates technical and business complexity to guide conversation depth
+4. **Perspective Priming**: Prepares each agent with role-specific context and priorities
+
+#### 3. Conversation Generation Engine
+
+**Turn-Based Interaction Model**:
+- **Structured Discourse**: Each turn represents ~15 minutes of real-time discussion
+- **Dynamic Speaking Order**: Randomized agent order prevents artificial conversation patterns
+- **Contextual Handoffs**: Agents naturally reference and build upon previous contributions
+- **Parallel Processing**: Agents can process information simultaneously while maintaining conversational flow
+
+**Response Generation Process**:
+1. **Context Integration**: Agent processes full conversation history and current topic focus
+2. **Role-Specific Analysis**: Applies professional lens to evaluate the feature/decision
+3. **Perspective Synthesis**: Generates response based on personality, goals, and expertise
+4. **Quality Validation**: Ensures responses are constructive, relevant, and in-character
+
+**Conversation Control Mechanisms**:
+- **Topic Management**: Prevents conversational drift through goal-oriented prompting
+- **Participation Balance**: Ensures all relevant perspectives are represented
+- **Depth Control**: Manages technical vs. strategic discussion levels
+- **Conflict Resolution**: Handles disagreements constructively to reach synthesis
+
+#### 4. Feedback Synthesis Algorithm
+
+**Multi-Perspective Analysis Engine**:
+- **Sentiment Analysis**: Tracks positive, negative, and neutral reactions across personas
+- **Concern Categorization**: Groups feedback into technical, user experience, business, and ethical dimensions
+- **Priority Scoring**: Weights feedback based on agent expertise and organizational impact
+- **Consensus Detection**: Identifies areas of agreement and persistent disagreements
+
+**Synthesis Process**:
+1. **Content Analysis**: Extracts key insights, concerns, and recommendations from each turn
+2. **Cross-Reference Mapping**: Identifies supporting and conflicting viewpoints
+3. **Impact Assessment**: Evaluates potential business and technical implications
+4. **Recommendation Generation**: Synthesizes actionable next steps and decision points
+
+### AI Decision-Making Architecture
+
+**Large Language Model Integration**:
+- **Model Selection**: Configurable backend (GPT-4, GPT-3.5) based on complexity and cost requirements
+- **Temperature Control**: Adjustable creativity vs. consistency based on simulation goals
+- **Context Window Management**: Efficient conversation history management for long discussions
+- **API Optimization**: Intelligent caching and rate limiting for cost-effective operation
+
+**Prompt Engineering Strategy**:
+- **Role-Specific Prompting**: Tailored system prompts for each professional persona
+- **Context-Aware Instructions**: Dynamic prompting based on conversation state and objectives
+- **Consistency Enforcement**: Mechanisms to maintain character and professional authenticity
+- **Quality Control**: Built-in validation to ensure constructive, relevant contributions
 
 ## Project Structure
 
