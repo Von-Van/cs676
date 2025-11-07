@@ -58,9 +58,31 @@ if CFG.has_section("OpenAI"):
     if CFG.has_option("OpenAI", "MODEL"):
         config_manager.update("model", CFG.get("OpenAI", "MODEL"))
 
-API_KEY = os.getenv("OPENAI_API_KEY") or CFG.get("openai", "api_key", fallback="")
+# API Key Security: Priority order for retrieving OpenAI API key
+# 1. Streamlit secrets (recommended for deployed apps)
+# 2. Environment variable (recommended for local dev)
+# 3. Config file (fallback, less secure - avoid committing keys)
+API_KEY = None
+try:
+    import streamlit as st
+    if hasattr(st, 'secrets') and 'openai' in st.secrets and 'api_key' in st.secrets['openai']:
+        API_KEY = st.secrets['openai']['api_key']
+except (ImportError, FileNotFoundError, KeyError):
+    pass
+
 if not API_KEY:
-    raise RuntimeError("Set OPENAI_API_KEY (env) or put it under [openai] api_key in config/config.ini")
+    API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not API_KEY:
+    API_KEY = CFG.get("openai", "api_key", fallback="")
+
+if not API_KEY:
+    raise RuntimeError(
+        "OpenAI API key not found. Please set via one of:\n"
+        "  1. Streamlit secrets: .streamlit/secrets.toml (see secrets.toml.example)\n"
+        "  2. Environment variable: OPENAI_API_KEY\n"
+        "  3. Config file: config/config.ini [openai] api_key (less secure)"
+    )
 
 MODEL = CFG.get("model", "name", fallback="gpt-4.1-mini")
 TEMPERATURE = CFG.getfloat("run", "temperature", fallback=0.7)
