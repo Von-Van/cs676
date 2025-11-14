@@ -1,54 +1,152 @@
-# TinyTroupe Persona Simulator - Quick Launch Guide
+# TinyTroupe Simulation Engine - Production Launch Guide
 
-## Option 1: Double-Click Launch (Recommended)
+> **🚀 New Enhanced Version**: This guide covers launching the consolidated, production-ready TinyTroupe simulation engine with advanced features including real-time monitoring, enhanced persona validation, and comprehensive analytics.
 
-### Windows Batch File (Easiest):
-1. Double-click `launch_app.bat` in this folder
-2. A browser window will open automatically with the app
-3. Close the command window when done
+## ⚡ Quick Start (Recommended)
 
-### PowerShell (Alternative):
+### Option 1: One-Click Launch
+**Windows Batch (Easiest)**:
+1. Double-click `launch_app.bat` 
+2. Browser opens automatically at http://localhost:8501
+3. Enhanced UI with monitoring dashboard loads
+
+**PowerShell (Advanced)**:
 1. Right-click `launch_app.ps1` → "Run with PowerShell"
-2. If you get a security warning, run this once in PowerShell as Administrator:
+2. For first-time users, enable scripts:
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
 
-## Option 2: Create Desktop Shortcut
+## 🖥️ Create Desktop Shortcuts
 
-### For Batch File:
-1. Right-click `launch_app.bat`
-2. Click "Create shortcut"
-3. Drag the shortcut to your Desktop
-4. (Optional) Right-click shortcut → Properties → Change Icon to customize
+### Batch File Shortcut:
+1. Right-click `launch_app.bat` → "Create shortcut"
+2. Drag shortcut to Desktop
+3. Optional: Right-click shortcut → Properties → Change Icon
 
-### For PowerShell:
+### PowerShell Shortcut:
 1. Right-click Desktop → New → Shortcut
-2. Enter location: 
+2. Target location:
    ```
-   powershell.exe -ExecutionPolicy Bypass -File "C:\Users\jakem\Documents\GitHub\cs676\project2\P2 Deliverable 2\launch_app.ps1"
+   powershell.exe -ExecutionPolicy Bypass -File "[PATH_TO_PROJECT]\launch_app.ps1"
    ```
-3. Name it "TinyTroupe Simulator"
-4. (Optional) Right-click → Properties → Change Icon
+3. Name: "TinyTroupe Production"
 
-## Option 3: Pin to Taskbar
-1. Create a desktop shortcut (see above)
-2. Right-click the shortcut → "Pin to taskbar"
-3. Now you can launch with one click from taskbar!
+## 🎯 Alternative Launch Methods
 
-## Option 4: Start Menu Entry
-1. Press `Win + R`
-2. Type: `shell:startup`
-3. Copy `launch_app.bat` to this folder
-4. It will now appear in your Start Menu
+### Command Line Interface
+```bash
+# Navigate to project directory
+cd "C:\Users\jakem\Documents\GitHub\cs676\project2\P2 Deliverable 2"
 
-## Manual Launch (If scripts don't work):
-```cmd
-cd ""
-streamlit run app.py
+# Launch web interface
+streamlit run app_updated.py
+
+# Or use command line engine directly
+python scripts/simulation_engine.py --help
 ```
 
-## Troubleshooting:
-- **"streamlit is not recognized"**: Virtual environment not activated
-- **Import errors**: Run `pip install -r requirements.txt`
-- **Port already in use**: Close other Streamlit instances or use `streamlit run app.py --server.port 8502`
+### Direct Engine Usage (No UI)
+```bash
+# Single simulation
+python scripts/simulation_engine.py --mode single --seed "Your topic here" --turns 6
+
+# Batch experiments
+python scripts/simulation_engine.py --mode experiment --variants baseline creative --runs 3
+
+# Validate persona database
+python scripts/simulation_engine.py --mode validate
+```
+
+## 🔧 Configuration Options
+
+### API Key Setup (Choose one):
+
+**1. Environment Variable (Recommended)**:
+```bash
+set OPENAI_API_KEY=your-api-key-here
+```
+
+**2. Streamlit Secrets**:
+Create `.streamlit/secrets.toml`:
+```toml
+[openai]
+api_key = "your-api-key-here"
+```
+
+**3. Config File**:
+Edit `config/config.ini`:
+```ini
+[openai]
+api_key = your-api-key-here
+```
+
+### Advanced Configuration
+Edit `config/config.ini` for production settings:
+```ini
+[OpenAI]
+model = gpt-4o-mini
+temperature = 0.7
+
+[Simulation]
+parallel_agent_actions = True
+max_turns = 6
+
+[Performance]
+max_workers = 3
+rate_limit_delay = 1.0
+```
+
+## ✨ New Features Available
+
+### Enhanced Web Interface (`app_updated.py`)
+- 📊 **Real-time Monitoring**: Performance metrics during execution
+- 🎛️ **Advanced Controls**: Parallel execution, rate limiting, cost tracking
+- 👥 **Dynamic Personas**: Create and validate personas through UI
+- 📈 **Live Analytics**: Automatic conversation analysis with visualizations
+- 🛡️ **Security Features**: Session limits, API usage tracking
+- 💾 **Multiple Export Formats**: JSON, JSONL, Markdown with analysis
+
+### Consolidated Engine (`scripts/simulation_engine.py`)
+- 🎯 **Unified API**: Single script replaces 4 separate tools
+- 🚀 **Production Ready**: Error handling, monitoring, load balancing
+- 🔍 **Comprehensive Validation**: 15+ persona validation rules
+- ⚡ **Performance Optimized**: Parallel execution, smart batching
+- 📊 **Built-in Analytics**: Automatic conversation analysis
+
+## 🛠️ Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "streamlit not found" | Run `pip install -r requirements.txt` |
+| "Import errors" | Check virtual environment activation |
+| "API key missing" | Set OPENAI_API_KEY environment variable |
+| "Port already in use" | Use `streamlit run app_updated.py --server.port 8502` |
+| "Permission denied" | Run PowerShell as administrator once to set execution policy |
+| "Persona validation errors" | Check `data/personas.agents.json` format |
+
+## 📊 System Requirements
+
+- **Python**: 3.8+ 
+- **Memory**: 4GB+ recommended for large simulations
+- **Storage**: 1GB+ for outputs and cache
+- **Network**: Stable connection for OpenAI API
+
+## 🎮 Usage Tips
+
+1. **Start Small**: Begin with 3-4 personas and 4-6 turns
+2. **Monitor Performance**: Use the built-in metrics dashboard
+3. **Enable Caching**: Speeds up repeated runs significantly
+4. **Use Parallel Mode**: For better performance with multiple personas
+5. **Check Validation**: Always validate personas before large runs
+
+## 📞 Getting Help
+
+- **Documentation**: See `DOCUMENTATION.md` for complete guide
+- **Debug Info**: Enable "Show Debug Info" in the web interface
+- **Logs**: Check terminal output for detailed error messages
+- **Config Issues**: Verify `config/config.ini` settings
+
+---
+
+**Ready to start?** Double-click `launch_app.bat` and explore the enhanced interface! 🚀
