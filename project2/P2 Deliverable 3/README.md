@@ -18,17 +18,6 @@ A production-ready multi-agent simulation platform built on Microsoft TinyTroupe
 
 **Important**: This app requires an OpenAI API key to function.
 
-### Add Your API Key
-
-1. Go to your Space **Settings** tab
-2. Scroll to **Repository secrets**
-3. Click **New secret**
-4. Add:
-   - **Name**: `OPENAI_API_KEY`
-   - **Value**: Your OpenAI API key (starts with `sk-`)
-5. Click **Add secret**
-6. The Space will restart automatically
-
 ### Optional Configuration
 
 You can also configure these settings in the sidebar:
@@ -37,13 +26,6 @@ You can also configure these settings in the sidebar:
 - **Max Rounds**: Number of conversation turns
 
 ## 🚀 Quick Start
-
-### For Hugging Face Users
-1. Add your OpenAI API key as a secret (see above)
-2. Wait for the Space to load
-3. Enter a discussion topic
-4. Select personas (manual or AI auto-selection)
-5. Click "Run Simulation"
 
 ### For Local Installation
 **Prerequisites**: Python 3.10+, OpenAI API key
