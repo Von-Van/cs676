@@ -729,12 +729,18 @@ with st.sidebar:
                 "Innovation potential", "Ethical considerations", "Cost-effectiveness"
             ], key="creator_perspective")
         
-        # Advanced settings
-        with st.expander("Advanced Settings", expanded=False):
-            custom_temperature = st.slider("Response Creativity", 0.0, 1.0, 0.7, 0.1, key="creator_temp")
-            response_style = st.selectbox("Response Style", [
-                "Concise", "Detailed", "Balanced", "Question-focused", "Solution-oriented"
-            ], key="creator_response_style")
+        # Advanced settings (avoid nested expanders on Streamlit)
+        # Use a checkbox to reveal advanced controls instead of an expander
+        custom_temperature = 0.7
+        response_style = "Balanced"
+        show_advanced_creator = st.checkbox("Show Advanced Settings", value=False, key="creator_show_advanced")
+        if show_advanced_creator:
+            adv_container = st.container()
+            with adv_container:
+                custom_temperature = st.slider("Response Creativity", 0.0, 1.0, 0.7, 0.1, key="creator_temp")
+                response_style = st.selectbox("Response Style", [
+                    "Concise", "Detailed", "Balanced", "Question-focused", "Solution-oriented"
+                ], key="creator_response_style")
         
         # Create button
         if st.button("🎭 Create Custom Persona", type="primary", key="create_persona_btn"):
@@ -783,15 +789,19 @@ with st.sidebar:
                             score_color = "🟢" if validation_result.realism_score >= 0.8 else "🟡" if validation_result.realism_score >= 0.6 else "🔴"
                             st.info(f"{score_color} Realism: {validation_result.realism_score:.0%}")
                         
-                        # Show warnings if any
+                        # Show warnings if any (avoid nested expanders)
                         if validation_result.warnings:
-                            with st.expander("⚠️ Validation Warnings", expanded=False):
+                            st.subheader("⚠️ Validation Warnings")
+                            warn_container = st.container()
+                            with warn_container:
                                 for warning in validation_result.warnings:
                                     st.warning(warning)
-                        
-                        # Show suggestions if any
+
+                        # Show suggestions if any (avoid nested expanders)
                         if validation_result.suggestions:
-                            with st.expander("💡 Improvement Suggestions", expanded=False):
+                            st.subheader("💡 Improvement Suggestions")
+                            sugg_container = st.container()
+                            with sugg_container:
                                 for suggestion in validation_result.suggestions:
                                     st.info(suggestion)
                         
