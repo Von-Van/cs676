@@ -49,6 +49,17 @@ from tinytroupe.agent import TinyPerson
 from tinytroupe.environment import TinyWorld
 from tinytroupe import config_manager
 from tinytroupe.openai_utils import force_api_cache
+from tinytroupe.agent.memory import EpisodicMemory, SemanticMemory
+from tinytroupe.agent.mental_faculty import RecallFaculty, TinyToolUse
+from tinytroupe.factory import TinyPersonFactory
+from tinytroupe.tools import TinyWordProcessor
+
+# Persona validation
+try:
+    from scripts.persona_validator import PersonaValidator, ValidationResult
+    HAS_VALIDATOR = True
+except ImportError:
+    HAS_VALIDATOR = False
 
 # Optional analysis dependencies
 try:
@@ -77,7 +88,7 @@ class SimulationConfig:
     seed: str = ""
     
     # Persona settings
-    personas_file: str = "personas.agents.json"
+    personas_file: str = "data/personas.agents.json"
     max_personas: int = 10
     persona_timeout: float = 30.0
     
@@ -102,6 +113,21 @@ class SimulationConfig:
     timeout_seconds: int = 300
     graceful_degradation: bool = True
     fallback_model: str = "gpt-3.5-turbo"
+    
+    # Memory and cognitive features
+    enable_session_memory: bool = True
+    enable_recall_faculty: bool = True
+    enable_collaborative_tools: bool = True
+    memory_retention_turns: int = 50
+    
+    # Agent selection
+    enable_smart_agent_selection: bool = True
+    max_selected_agents: int = 5
+    agent_selection_model: str = "gpt-4o-mini"
+    
+    # Token limits
+    max_tokens_per_turn: int = 12000
+    max_completion_tokens: int = 8000
 
 @dataclass
 class PersonaSpec:
@@ -213,17 +239,42 @@ class PersonaDatabase:
                     validation_rules=spec_dict.get('validation_rules', {})
                 )
                 
-                # Validate if enabled
-                if self.validation_enabled:
-                    issues = persona.validate()
-                    if issues:
-                        validation_errors.extend([f"Persona {i} ({persona.name}): {issue}" for issue in issues])
-                        continue
+                # Enhanced validation with consistency and realism checking
+                if self.validation_enabled and HAS_VALIDATOR:
+                    try:
+                        validator = PersonaValidator()
+                        validation_result = validator.validate_persona_structure(spec_dict)
+                        
+                        if not validation_result.is_valid:
+                            for issue in validation_result.issues:
+                                validation_errors.append(f"Persona {i} ({persona.name}): {issue}")
+                        
+                        # Log warnings and suggestions
+                        if validation_result.warnings:
+                            for warning in validation_result.warnings:
+                                self.logger.warning(f"Persona {persona.name}: {warning}")
+                        
+                        if validation_result.consistency_score < 0.7:
+                            self.logger.warning(
+                                f"Persona {persona.name} has low consistency score: "
+                                f"{validation_result.consistency_score:.2f}"
+                            )
+                        
+                        if validation_result.realism_score < 0.7:
+                            self.logger.warning(
+                                f"Persona {persona.name} has low realism score: "
+                                f"{validation_result.realism_score:.2f}"
+                            )
+                    except Exception as val_error:
+                        self.logger.warning(f"Validation failed for {persona.name}: {val_error}")
                 
                 personas.append(persona)
+                self.personas_cache[persona.id] = persona
+                self.logger.debug(f"Successfully loaded persona: {persona.name} (ID: {persona.id})")
                 
             except Exception as e:
                 validation_errors.append(f"Persona {i}: Error creating persona - {str(e)}")
+                self.logger.error(f"Failed to create persona {i}: {e}")
         
         if validation_errors:
             error_msg = "Persona validation errors:\n" + "\n".join(validation_errors)
@@ -238,14 +289,59 @@ class PersonaDatabase:
         self.logger.info(f"Loaded {len(personas)} personas from {personas_file}")
         return personas
     
+    def get_all_personas(self) -> Dict[str, PersonaSpec]:
+        """Get all loaded personas as a dictionary mapping names to PersonaSpec objects."""
+        self.logger.debug(f"get_all_personas called, cache size: {len(self.personas_cache)}")
+        
+        if not self.personas_cache:
+            # Load personas if cache is empty
+            try:
+                self.logger.debug("Cache is empty, loading personas...")
+                personas_list = self.load_personas()
+                self.logger.debug(f"load_personas returned {len(personas_list)} personas")
+                # Cache should already be populated by load_personas, but double-check
+                for persona in personas_list:
+                    self.personas_cache[persona.id] = persona
+                    self.logger.debug(f"Added to cache: {persona.name} (ID: {persona.id})")
+            except Exception as e:
+                self.logger.error(f"Failed to load personas: {e}")
+                return {}
+        
+        self.logger.debug(f"Returning {len(self.personas_cache)} personas from cache")
+        result = {persona.name: persona for persona in self.personas_cache.values()}
+        self.logger.debug(f"Result dict has {len(result)} entries: {list(result.keys())}")
+        return result
+    
+    def get_persona_by_id(self, persona_id: str) -> Optional[PersonaSpec]:
+        """Get a specific persona by ID."""
+        return self.personas_cache.get(persona_id)
+    
     def create_tiny_persons(self, persona_specs: List[PersonaSpec]) -> List[TinyPerson]:
         """Convert PersonaSpecs to TinyPerson objects with robust error handling."""
-        agents = []
+        # Clear the global TinyPerson registry to allow agent reuse
+        try:
+            if hasattr(TinyPerson, 'all_agents'):
+                TinyPerson.all_agents.clear()
+            if hasattr(TinyPerson, '_name_to_agent'):
+                TinyPerson._name_to_agent.clear()
+            self.logger.debug("Cleared TinyPerson global registry")
+        except Exception as e:
+            self.logger.warning(f"Could not clear TinyPerson registry: {e}")
         
-        for spec in persona_specs:
+        agents = []
+        timestamp_suffix = datetime.now().strftime('%H%M%S%f')[:10]
+        
+        for idx, spec in enumerate(persona_specs):
             try:
+                # Create unique agent name to prevent collisions
+                unique_name = f"{spec.id}_{timestamp_suffix}_{idx}"
+                
                 # Create TinyPerson with proper initialization
-                agent = TinyPerson(name=spec.id)
+                agent = TinyPerson(name=unique_name)
+                
+                # Store original name for display purposes
+                agent._display_name = spec.name
+                agent._original_id = spec.id
                 
                 # Configure core attributes
                 agent.define("role", spec.role)
@@ -269,6 +365,7 @@ class PersonaDatabase:
                 agent.define("age", None)
                 
                 agents.append(agent)
+                self.logger.debug(f"Created agent: {spec.name} (internal: {unique_name})")
                 
             except Exception as e:
                 error_msg = f"Failed to create TinyPerson for {spec.name}: {str(e)}"
@@ -313,8 +410,190 @@ class PersonaDatabase:
             json.dump(data, f, indent=2, ensure_ascii=False)
         
         self.logger.info(f"Saved {len(personas)} personas to {output_file}")
+    
+    def setup_session_memory(self, agent, session_id: str):
+        """Setup session memory for an agent (placeholder implementation)."""
+        try:
+            # For now, just return the agent as-is since TinyTroupe handles memory internally
+            self.logger.debug(f"Setting up session memory for {getattr(agent, 'name', 'unknown')} in session {session_id}")
+            return agent
+        except Exception as e:
+            self.logger.warning(f"Failed to setup session memory: {e}")
+            return agent
+    
+    def clear_session_memory(self, agents):
+        """Clear session memory for agents and reset them for reuse."""
+        try:
+            self.logger.debug(f"Clearing session memory for {len(agents)} agents")
+            for agent in agents:
+                # Clear agent's episodic memory
+                if hasattr(agent, '_episodic_memory'):
+                    agent._episodic_memory = []
+                # Clear agent's semantic memory
+                if hasattr(agent, '_semantic_memory'):
+                    agent._semantic_memory = {}
+                # Clear any cached messages
+                if hasattr(agent, '_messages'):
+                    agent._messages = []
+                # Reset current context
+                if hasattr(agent, '_current_context'):
+                    agent._current_context = None
+                self.logger.debug(f"Cleared memory for agent: {agent.name}")
+        except Exception as e:
+            self.logger.warning(f"Failed to clear session memory: {e}")
+    
+    def reset_agents_for_reuse(self, agents, world=None):
+        """Completely reset agents for reuse in a new simulation."""
+        try:
+            self.logger.debug(f"Resetting {len(agents)} agents for reuse")
+            
+            # Remove agents from world if provided
+            if world and hasattr(world, 'agents'):
+                world.agents = []
+            
+            # Clear all agent memories and state
+            for agent in agents:
+                # Clear episodic memory
+                if hasattr(agent, '_episodic_memory'):
+                    agent._episodic_memory = []
+                # Clear semantic memory  
+                if hasattr(agent, '_semantic_memory'):
+                    agent._semantic_memory = {}
+                # Clear cached messages
+                if hasattr(agent, '_messages'):
+                    agent._messages = []
+                # Clear current context
+                if hasattr(agent, '_current_context'):
+                    agent._current_context = None
+                # Clear any actions
+                if hasattr(agent, '_actions'):
+                    agent._actions = []
+                # Reset conversation history
+                if hasattr(agent, 'conversation_history'):
+                    agent.conversation_history = []
+                # Reset any world reference
+                if hasattr(agent, '_world'):
+                    agent._world = None
+                    
+                self.logger.debug(f"Reset agent {agent.name} for reuse")
+                
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to reset agents for reuse: {e}")
+            return False
 
 # ==================== SIMULATION ENGINE ====================
+
+class AgentSelector:
+    """Intelligent agent selection based on topic relevance."""
+    
+    def __init__(self, config: SimulationConfig):
+        self.config = config
+        self.logger = logging.getLogger(self.__class__.__name__)
+    
+    def select_agents_for_topic(self, topic: str, available_personas: List[PersonaSpec], max_agents: Optional[int] = None) -> List[PersonaSpec]:
+        """Select the most relevant agents for a given topic using AI."""
+        max_agents = max_agents or self.config.max_selected_agents
+        
+        if len(available_personas) <= max_agents:
+            return available_personas
+        
+        try:
+            # Create agent descriptions for evaluation
+            agent_descriptions = []
+            for persona in available_personas:
+                description = f"""
+                Name: {persona.name}
+                Role: {persona.role}
+                Description: {persona.description}
+                Personality: {persona.personality.get('traits', [])} - {persona.personality.get('style', '')}
+                Goals: {persona.personality.get('goals', [])}
+                """
+                agent_descriptions.append({
+                    "persona": persona,
+                    "description": description.strip()
+                })
+            
+            # Use LLM to select most relevant agents
+            selected_personas = self._ai_agent_selection(topic, agent_descriptions, max_agents)
+            
+            self.logger.info(f"Selected {len(selected_personas)} agents for topic: {topic}")
+            return selected_personas
+            
+        except Exception as e:
+            self.logger.error(f"Agent selection failed: {e}. Using first {max_agents} agents.")
+            return available_personas[:max_agents]
+    
+    def _ai_agent_selection(self, topic: str, agent_descriptions: List[Dict], max_agents: int) -> List[PersonaSpec]:
+        """Use AI to intelligently select agents based on topic relevance."""
+        import tinytroupe.openai_utils as openai_utils
+        
+        # Prepare agent list for the prompt
+        agent_list = ""
+        for i, desc in enumerate(agent_descriptions):
+            agent_list += f"{i+1}. {desc['description']}\n\n"
+        
+        prompt = f"""
+        You are an expert team composition advisor. Given a discussion topic and a list of available team members, select the {max_agents} most relevant and diverse participants who would contribute meaningfully to the discussion.
+        
+        DISCUSSION TOPIC: {topic}
+        
+        AVAILABLE TEAM MEMBERS:
+        {agent_list}
+        
+        SELECTION CRITERIA:
+        1. Expertise relevance to the topic
+        2. Diverse perspectives and backgrounds
+        3. Complementary skills and viewpoints
+        4. Potential for meaningful contribution
+        5. Balanced team composition
+        
+        Please select exactly {max_agents} team members by returning ONLY their numbers (e.g., "1,3,5,7,9").
+        No explanations or additional text - just the comma-separated numbers.
+        """
+        
+        try:
+            messages = [
+                {"role": "system", "content": "You are a team composition expert. Respond only with comma-separated numbers."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            response = openai_utils.client().send_message(
+                messages, 
+                model=self.config.agent_selection_model,
+                temperature=0.3,
+                max_tokens=2000  # Increased for better agent selection
+            )
+            
+            if response and response.get("content"):
+                # Parse the response
+                selected_indices = []
+                for num_str in response["content"].strip().split(","):
+                    try:
+                        idx = int(num_str.strip()) - 1  # Convert to 0-based index
+                        if 0 <= idx < len(agent_descriptions):
+                            selected_indices.append(idx)
+                    except ValueError:
+                        continue
+                
+                # Ensure we don't exceed max_agents
+                selected_indices = selected_indices[:max_agents]
+                
+                # If we don't have enough, fill with first available
+                while len(selected_indices) < min(max_agents, len(agent_descriptions)):
+                    for i in range(len(agent_descriptions)):
+                        if i not in selected_indices:
+                            selected_indices.append(i)
+                            break
+                    break
+                
+                return [agent_descriptions[i]["persona"] for i in selected_indices]
+        
+        except Exception as e:
+            self.logger.warning(f"AI agent selection failed: {e}")
+        
+        # Fallback: return first max_agents
+        return [desc["persona"] for desc in agent_descriptions[:max_agents]]
 
 class SimulationEngine:
     """Main simulation engine with comprehensive features."""
@@ -322,8 +601,10 @@ class SimulationEngine:
     def __init__(self, config: Optional[SimulationConfig] = None):
         self.config = config or SimulationConfig()
         self.persona_db = PersonaDatabase(self.config)
+        self.agent_selector = AgentSelector(self.config) if self.config.enable_smart_agent_selection else None
         self.metrics = SimulationMetrics()
         self.logger = self._setup_logging()
+        self.session_id = None
         
         # Performance tracking
         self.response_times = []
@@ -335,6 +616,13 @@ class SimulationEngine:
         
         # Load balancing
         self.worker_pool = None
+        
+        # Initialize personas cache
+        try:
+            self.persona_db.get_all_personas()  # This will trigger loading
+            self.logger.info(f"Initialized with {len(self.persona_db.personas_cache)} personas")
+        except Exception as e:
+            self.logger.warning(f"Failed to preload personas: {e}")
         if self.config.parallel_execution:
             self.worker_pool = ThreadPoolExecutor(max_workers=self.config.max_workers)
     
@@ -466,38 +754,95 @@ class SimulationEngine:
                       seed: str, 
                       turns: Optional[int] = None,
                       personas: Optional[List[str]] = None,
-                      custom_personas: Optional[List[PersonaSpec]] = None) -> Dict[str, Any]:
+                      custom_personas: Optional[List[PersonaSpec]] = None,
+                      use_smart_selection: Optional[bool] = None,
+                      environment_name: Optional[str] = None,
+                      environment_description: Optional[str] = None,
+                      custom_context: Optional[str] = None,
+                      discussion_goal: Optional[str] = None) -> Dict[str, Any]:
         """Run a single simulation with comprehensive monitoring."""
         
         self.metrics = SimulationMetrics()
         self.metrics.start_time = time.time()
         
+        # Generate session ID for memory management
+        self.session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
+        
         try:
             # Load personas
             if custom_personas:
-                persona_specs = custom_personas
+                available_personas = custom_personas
             else:
-                persona_specs = self.persona_db.load_personas()
+                available_personas = self.persona_db.load_personas()
             
-            # Filter personas if specified
-            if personas:
-                persona_specs = [p for p in persona_specs if p.name in personas or p.id in personas]
+            # Intelligent agent selection if enabled
+            if use_smart_selection is None:
+                use_smart_selection = self.config.enable_smart_agent_selection
             
-            # Limit number of personas for performance
-            if len(persona_specs) > self.config.max_personas:
-                persona_specs = persona_specs[:self.config.max_personas]
-                self.logger.warning(f"Limited personas to {self.config.max_personas} for performance")
+            if use_smart_selection and self.agent_selector and not personas:
+                self.logger.info(f"Using intelligent agent selection for topic: {seed[:100]}...")
+                selected_personas = self.agent_selector.select_agents_for_topic(
+                    seed, 
+                    available_personas,
+                    self.config.max_personas
+                )
+                persona_specs = selected_personas
+                
+                # Log selected agents
+                selected_names = [p.name for p in selected_personas]
+                self.logger.info(f"Selected agents: {', '.join(selected_names)}")
+                
+            elif personas:
+                # Filter by specified names
+                persona_specs = [p for p in available_personas if p.name in personas or p.id in personas]
+                if len(persona_specs) != len(personas):
+                    found_names = {p.name for p in persona_specs}
+                    missing = set(personas) - found_names
+                    self.logger.warning(f"Some personas not found: {missing}")
+            else:
+                # Use all available personas (limited by config)
+                persona_specs = available_personas[:self.config.max_personas]
             
-            # Create TinyPerson agents
+            if not persona_specs:
+                raise ValueError("No personas available for simulation")
+            
+            # Create TinyPerson agents with session memory
             agents = self.persona_db.create_tiny_persons(persona_specs)
+            
+            # Setup session memory for each agent
+            if self.config.enable_session_memory:
+                try:
+                    agents = [self.persona_db.setup_session_memory(agent, self.session_id) for agent in agents]
+                except Exception as memory_error:
+                    self.logger.warning(f"Session memory setup failed: {memory_error}")
+            
             self.metrics.personas_active = len(agents)
+            
+            # Use custom environment settings or defaults with unique suffix to avoid reuse errors
+            base_env_name = environment_name or "DiscussionRoom"
+            env_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            env_name = f"{base_env_name}_{env_timestamp}"
+            env_description = environment_description or "A professional meeting room designed for collaborative discussions."
+            goal = discussion_goal or "Participate constructively in the discussion. Be concrete and practical."
+            
+            # Clear TinyWorld global registry if it exists
+            try:
+                if hasattr(TinyWorld, 'all_environments'):
+                    TinyWorld.all_environments.clear()
+                if hasattr(TinyWorld, '_name_to_world'):
+                    TinyWorld._name_to_world.clear()
+                self.logger.debug("Cleared TinyWorld global registry")
+            except Exception as e:
+                self.logger.warning(f"Could not clear TinyWorld registry: {e}")
             
             # Set up world environment
             world = TinyWorld(
-                name="DiscussionRoom",
+                name=env_name,
                 agents=agents,
                 initial_datetime=datetime.now()
             )
+            
+            self.logger.debug(f"Created world: {base_env_name} (internal: {env_name})")
             
             try:
                 world.make_everyone_accessible()
@@ -506,9 +851,13 @@ class SimulationEngine:
             
             # Set context
             context_lines = [
-                "Group discussion about product features and technology",
+                f"Environment: {env_description}",
                 f"Topic: {seed}"
             ]
+            
+            # Add custom context if provided
+            if custom_context and custom_context.strip():
+                context_lines.append(f"Additional Context: {custom_context.strip()}")
             
             try:
                 world.broadcast_context_change(context_lines)
@@ -520,16 +869,14 @@ class SimulationEngine:
             
             # Set initial goal
             try:
-                world.broadcast_internal_goal(
-                    "Participate constructively in the discussion. Be concrete and practical."
-                )
+                world.broadcast_internal_goal(goal)
             except Exception as e:
                 self.logger.warning(f"Could not set internal goal: {e}")
             
-            # Move agents to discussion room
+            # Move agents to discussion environment
             for agent in agents:
                 try:
-                    agent.move_to("DiscussionRoom")
+                    agent.move_to(env_name)
                 except Exception as e:
                     self.logger.warning(f"Could not move {agent.name}: {e}")
             
@@ -560,11 +907,29 @@ class SimulationEngine:
                         except Exception:
                             pass
                         
+                        # Capture AI thoughts from episodic memory
+                        thoughts = None
+                        try:
+                            if hasattr(agent, '_episodic_memory') and agent._episodic_memory:
+                                # Get the most recent memory entry
+                                recent_memory = agent._episodic_memory[-1]
+                                if isinstance(recent_memory, dict):
+                                    thoughts = recent_memory.get('stimulus', '')
+                                elif isinstance(recent_memory, str):
+                                    thoughts = recent_memory
+                        except Exception as thought_error:
+                            self.logger.debug(f"Could not extract thoughts: {thought_error}")
+                        
+                        # Use display name if available, otherwise use agent name
+                        speaker_name = getattr(agent, '_display_name', agent.name)
+                        
                         transcript.append({
                             "turn": turn,
-                            "speaker": agent.name,
+                            "speaker": speaker_name,
                             "role": role,
-                            "text": text,
+                            "content": text,  # Changed from "text" to "content" to match UI expectation
+                            "text": text,     # Keep both for compatibility
+                            "thoughts": thoughts,  # Add captured thoughts
                             "timestamp": datetime.now().isoformat()
                         })
                         
@@ -584,11 +949,21 @@ class SimulationEngine:
             if self.response_times:
                 self.metrics.average_response_time = sum(self.response_times) / len(self.response_times)
             
+            # Generate conversation analysis
+            analysis = None
+            if self.config.auto_analysis and transcript:
+                try:
+                    analysis = self.analyze_conversation(transcript)
+                except Exception as analysis_error:
+                    self.logger.warning(f"Analysis failed: {analysis_error}")
+            
             # Prepare results
             results = {
                 "success": True,
                 "transcript": transcript,
-                "agents": [{"name": a.name, "role": getattr(a, "role", "Unknown")} for a in agents],
+                "agents": [{"name": getattr(a, '_display_name', a.name), "role": getattr(a, "role", "Unknown")} for a in agents],
+                "agent_objects": agents,  # Include actual agent objects for reuse and chat
+                "analysis": analysis,  # Add analysis to results
                 "metrics": {
                     "duration": self.metrics.duration,
                     "total_messages": self.metrics.total_messages,
@@ -605,11 +980,25 @@ class SimulationEngine:
                     "model": self.config.model,
                     "temperature": self.config.temperature,
                     "turns": turns,
-                    "seed": seed
-                }
+                    "seed": seed,
+                    "environment_name": env_name,
+                    "environment_description": env_description,
+                    "discussion_goal": goal,
+                    "custom_context": custom_context
+                },
+                "session_id": self.session_id,
+                "selected_agents": [getattr(agent, '_display_name', agent.name) for agent in agents] if use_smart_selection else None
             }
             
             self.logger.info(f"Simulation completed successfully in {self.metrics.duration:.1f}s")
+            
+            # Clean up agents and world for reuse
+            try:
+                self.persona_db.reset_agents_for_reuse(agents, world)
+                self.logger.debug("Agents and world cleaned up for reuse")
+            except Exception as cleanup_error:
+                self.logger.warning(f"Failed to cleanup agents/world: {cleanup_error}")
+            
             return results
             
         except Exception as e:
@@ -631,6 +1020,17 @@ class SimulationEngine:
                 raise
             
             return error_result
+        
+        finally:
+            # Clean up session memory if configured
+            if hasattr(self, 'session_id') and self.config.enable_session_memory:
+                try:
+                    if 'agents' in locals():
+                        self.persona_db.clear_session_memory(agents)
+                except Exception as cleanup_error:
+                    self.logger.warning(f"Failed to cleanup session memory: {cleanup_error}")
+            
+            self.logger.debug(f"Simulation cleanup completed for session {getattr(self, 'session_id', 'unknown')}")
     
     def run_experiments(self, 
                        variants: Dict[str, Dict[str, Any]], 
