@@ -6,9 +6,44 @@ import streamlit as st
 import json
 import time
 import copy
+import os
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+
+# ========================================
+# Hugging Face Secrets Configuration
+# ========================================
+def setup_api_key():
+    """Configure OpenAI API key from Hugging Face secrets or environment."""
+    # Priority 1: Check Streamlit secrets (Hugging Face)
+    if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+        os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
+        return True
+    
+    # Priority 2: Check environment variable
+    if 'OPENAI_API_KEY' in os.environ and os.environ['OPENAI_API_KEY']:
+        return True
+    
+    # Priority 3: Check config file
+    config_path = Path('config/config.ini')
+    if config_path.exists():
+        try:
+            import configparser
+            parser = configparser.ConfigParser()
+            parser.read(config_path)
+            if 'OpenAI' in parser and 'api_key' in parser['OpenAI']:
+                api_key = parser['OpenAI']['api_key']
+                if api_key and not api_key.startswith('#') and api_key != 'sk-your-api-key-here':
+                    os.environ['OPENAI_API_KEY'] = api_key
+                    return True
+        except Exception:
+            pass
+    
+    return False
+
+# Configure API key before importing simulation engine
+has_api_key = setup_api_key()
 
 # Import the simulation engine
 from scripts.simulation_engine import SimulationEngine, SimulationConfig, PersonaSpec
@@ -447,6 +482,30 @@ st.markdown("""
     <p class="hero-description">✨ Enhanced with Session Memory & Intelligent Agent Selection ✨</p>
 </div>
 """, unsafe_allow_html=True)
+
+# ---------- API Key Check ----------
+if not has_api_key:
+    st.error("⚠️ **OpenAI API Key Required**")
+    st.markdown("""
+    This application requires an OpenAI API key to function. Please configure it using one of these methods:
+    
+    **For Hugging Face Spaces:**
+    1. Go to your Space **Settings** tab
+    2. Scroll to **Repository secrets** section
+    3. Click **New secret**
+    4. Add a secret with:
+       - **Name**: `OPENAI_API_KEY`
+       - **Value**: Your OpenAI API key (starts with `sk-`)
+    5. Click **Add secret**
+    6. The Space will restart automatically
+    
+    **For Local Deployment:**
+    - Edit `config/config.ini` and add your API key under `[OpenAI]` section
+    - Or set the `OPENAI_API_KEY` environment variable
+    
+    **Get an API Key:** Visit https://platform.openai.com/api-keys
+    """)
+    st.stop()
 
 # ---------- Initialize Engine ----------
 @st.cache_resource

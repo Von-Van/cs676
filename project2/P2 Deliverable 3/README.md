@@ -1,13 +1,52 @@
-# AI Persona Panel Simulator
+---
+title: AI Persona Panel Simulator
+emoji: 🧠
+colorFrom: purple
+colorTo: blue
+sdk: streamlit
+sdk_version: 1.32.0
+app_file: app_updated.py
+pinned: false
+license: mit
+---
+
+# 🧠 AI Persona Panel Simulator
 
 A production-ready multi-agent simulation platform built on Microsoft TinyTroupe with advanced features including agent reuse, validation, monitoring, security, and comprehensive analysis.
 
+## ⚙️ Hugging Face Configuration
+
+**Important**: This app requires an OpenAI API key to function.
+
+### Add Your API Key
+
+1. Go to your Space **Settings** tab
+2. Scroll to **Repository secrets**
+3. Click **New secret**
+4. Add:
+   - **Name**: `OPENAI_API_KEY`
+   - **Value**: Your OpenAI API key (starts with `sk-`)
+5. Click **Add secret**
+6. The Space will restart automatically
+
+### Optional Configuration
+
+You can also configure these settings in the sidebar:
+- **Model**: Choose between GPT-4o-mini (faster, cheaper) or GPT-4 (more capable)
+- **Temperature**: Adjust creativity (0.0-1.0)
+- **Max Rounds**: Number of conversation turns
+
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.10 or higher
-- OpenAI API key
-- Windows, macOS, or Linux
+### For Hugging Face Users
+1. Add your OpenAI API key as a secret (see above)
+2. Wait for the Space to load
+3. Enter a discussion topic
+4. Select personas (manual or AI auto-selection)
+5. Click "Run Simulation"
+
+### For Local Installation
+**Prerequisites**: Python 3.10+, OpenAI API key
 
 ### Installation
 

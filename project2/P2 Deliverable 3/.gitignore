@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project Specific
+*.pickle
+archive/
+outputs/*.jsonl
+outputs/*.md
+outputs/visualizations/*.png
+logs/
+backups/
+
+# Environment files (should use HF secrets instead)
+.env
+.env.local
+
+# Local config (use HF secrets for API keys)
+config/config.ini
+
+# Windows launcher scripts (not needed on HF)
+launch_app.bat
+launch_app.ps1
